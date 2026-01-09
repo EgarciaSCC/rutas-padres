@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MobileLayout from "@/components/layout/MobileLayout";
 import { Calendar as CalendarIcon, Filter, ChevronLeft, ChevronRight, AlertTriangle, Clock, Home, School, Bus, X, Plus, FileText, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { api } from "@/lib/api";
 
 interface Novelty {
   id: number;
@@ -23,121 +24,7 @@ interface Novelty {
   createdAt: Date;
 }
 
-const childrenList = [
-  { id: "all", name: "Todos los hijos" },
-  { id: "alfonso", name: "Alfonso Miguel" },
-  { id: "luis", name: "Luis José" },
-];
-
-const routeSchedules = [
-  {
-    id: 1,
-    childId: "alfonso",
-    childName: "Alfonso Miguel",
-    date: new Date(2026, 0, 5),
-    type: "morning",
-    departureTime: "6:00 AM",
-    pickupTime: "6:30 AM",
-    arrivalSchool: "7:15 AM",
-    route: "Ruta Norte - Bus #12",
-  },
-  {
-    id: 2,
-    childId: "alfonso",
-    childName: "Alfonso Miguel",
-    date: new Date(2026, 0, 5),
-    type: "afternoon",
-    departureSchool: "2:30 PM",
-    arrivalHome: "3:15 PM",
-    route: "Ruta Norte - Bus #12",
-  },
-  {
-    id: 3,
-    childId: "luis",
-    childName: "Luis José",
-    date: new Date(2026, 0, 5),
-    type: "morning",
-    departureTime: "6:00 AM",
-    pickupTime: "6:45 AM",
-    arrivalSchool: "7:30 AM",
-    route: "Ruta Sur - Bus #8",
-  },
-  {
-    id: 4,
-    childId: "luis",
-    childName: "Luis José",
-    date: new Date(2026, 0, 5),
-    type: "afternoon",
-    departureSchool: "2:00 PM",
-    arrivalHome: "2:45 PM",
-    route: "Ruta Sur - Bus #8",
-  },
-  // Adding more dates for demo
-  {
-    id: 5,
-    childId: "alfonso",
-    childName: "Alfonso Miguel",
-    date: new Date(2026, 0, 7),
-    type: "morning",
-    departureTime: "6:00 AM",
-    pickupTime: "6:30 AM",
-    arrivalSchool: "7:15 AM",
-    route: "Ruta Norte - Bus #12",
-  },
-  {
-    id: 6,
-    childId: "luis",
-    childName: "Luis José",
-    date: new Date(2026, 0, 7),
-    type: "morning",
-    departureTime: "6:00 AM",
-    pickupTime: "6:45 AM",
-    arrivalSchool: "7:30 AM",
-    route: "Ruta Sur - Bus #8",
-  },
-  {
-    id: 7,
-    childId: "alfonso",
-    childName: "Alfonso Miguel",
-    date: new Date(2026, 0, 8),
-    type: "morning",
-    departureTime: "6:00 AM",
-    pickupTime: "6:30 AM",
-    arrivalSchool: "7:15 AM",
-    route: "Ruta Norte - Bus #12",
-  },
-  {
-    id: 8,
-    childId: "luis",
-    childName: "Luis José",
-    date: new Date(2026, 0, 9),
-    type: "afternoon",
-    departureSchool: "2:00 PM",
-    arrivalHome: "2:45 PM",
-    route: "Ruta Sur - Bus #8",
-  },
-];
-
-const exceptions = [
-  {
-    id: 1,
-    date: new Date(2026, 0, 6),
-    reason: "Día festivo - Reyes Magos",
-    affectsAll: true,
-  },
-  {
-    id: 2,
-    date: new Date(2026, 0, 12),
-    reason: "Reunión de padres - Sin transporte",
-    affectsAll: true,
-  },
-  {
-    id: 3,
-    date: new Date(2026, 0, 20),
-    reason: "Mantenimiento de buses",
-    affectsAll: true,
-  },
-];
+// Los datos de hijos, schedules y exceptions se cargan desde el servicio mock
 
 const Calendar = () => {
   const { toast } = useToast();
@@ -146,9 +33,34 @@ const Calendar = () => {
   const [selectedChild, setSelectedChild] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNoveltyFormOpen, setIsNoveltyFormOpen] = useState(false);
+  const [childrenList, setChildrenList] = useState<{ id: string; name: string }[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [exceptions, setExceptions] = useState<any[]>([]);
+  const [loadingCalendarData, setLoadingCalendarData] = useState(true);
   const [noveltyNote, setNoveltyNote] = useState("");
   const [selectedChildrenForNovelty, setSelectedChildrenForNovelty] = useState<string[]>([]);
   const [novelties, setNovelties] = useState<Novelty[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingCalendarData(true);
+    Promise.all([api.getChildren(), api.getSchedules(), api.getExceptions()])
+      .then(([childrenRes, schedulesRes, exceptionsRes]) => {
+        if (!mounted) return;
+        const list = [{ id: "all", name: "Todos los hijos" }, ...childrenRes.map((c: any) => ({ id: c.id, name: c.name }))];
+        setChildrenList(list);
+        setSchedules(schedulesRes);
+        setExceptions(exceptionsRes);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoadingCalendarData(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -166,14 +78,14 @@ const Calendar = () => {
   };
 
   const hasSchedule = (date: Date) => {
-    return routeSchedules.some((schedule) =>
+    return schedules.some((schedule) =>
       isSameDay(schedule.date, date) &&
       (selectedChild === "all" || schedule.childId === selectedChild)
     );
   };
 
   const getSchedulesForDate = (date: Date) => {
-    return routeSchedules.filter((schedule) =>
+    return schedules.filter((schedule) =>
       isSameDay(schedule.date, date) &&
       (selectedChild === "all" || schedule.childId === selectedChild)
     );
@@ -257,11 +169,13 @@ const Calendar = () => {
                 <SelectValue placeholder="Seleccionar hijo" />
               </SelectTrigger>
               <SelectContent>
-                {childrenList.map((child) => (
-                  <SelectItem key={child.id} value={child.id}>
-                    {child.name}
-                  </SelectItem>
-                ))}
+                {loadingCalendarData ? (
+                  <SelectItem key="loading" value="all">Cargando...</SelectItem>
+                ) : (
+                  childrenList.map((child) => (
+                    <SelectItem key={child.id} value={child.id}>{child.name}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </CardContent>

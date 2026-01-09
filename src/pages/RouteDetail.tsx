@@ -6,19 +6,7 @@ import RouteMap from "@/components/routes/RouteMap";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const childrenData: Record<string, { name: string; displayName: string }> = {
-  alfonso: { name: "Alfono Miguel Lopez Pumarejo", displayName: "Alfono" },
-  luis: { name: "Luis José Lopez Pumarejo", displayName: "Luis Lopez" },
-};
-
-const initialRouteEvents = [
-  { message: "Luis José abordó el bus", time: "05:50 pm" },
-  { message: "Luis José abordó el bus", time: "05:50 pm" },
-  { message: "El bus llegó al colegio", time: "05:43 pm" },
-  { message: "El bus está en 2 paradas", time: "05:30 pm" },
-  { message: "El bus está en 3 paradas", time: "05:23 pm" },
-];
+import { api } from "@/lib/api";
 
 const RouteDetailPage = () => {
   const { childId } = useParams<{ childId: string }>();
@@ -28,14 +16,44 @@ const RouteDetailPage = () => {
   const [activeTab, setActiveTab] = useState(initialTab);
   // Control global de visibilidad de eventos; el toggle se mostrará en el tab Mapa
   const [showEvents, setShowEvents] = useState(true);
-  // Lista dinámica de eventos (permite cerrar individualmente desde el tab mapa)
-  const [events, setEvents] = useState(initialRouteEvents);
+  // Lista dinámica de eventos (se carga desde api)
+  const [events, setEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
-  const child = childrenData[childId || "luis"] || childrenData.luis;
+  const [child, setChild] = useState<any | null>(null);
+  const [loadingChild, setLoadingChild] = useState(true);
 
   // Simulated bus location (Bogotá area)
   const [busLocation] = useState({ lat: 4.7247, lng: -74.0547 });
   const homeLocation = { lat: 4.7150, lng: -74.0600 };
+
+  useEffect(() => {
+    let mounted = true;
+    const id = childId || "luis";
+    setLoadingChild(true);
+    api.getChildById(id).then((res) => {
+      if (!mounted) return;
+      setChild(res);
+      setLoadingChild(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [childId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const id = childId || "luis";
+    setLoadingEvents(true);
+    api.getRouteEvents(id).then((res) => {
+      if (!mounted) return;
+      setEvents(res);
+      setLoadingEvents(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [childId]);
 
   return (
     <MobileLayout showHeader={true}>
@@ -43,14 +61,14 @@ const RouteDetailPage = () => {
         {/* Header section */}
         <div className="px-4 py-2">
           <h1 className="text-2xl font-bold text-foreground">
-            Ruta de <span className="text-primary">{child.displayName}</span>
+            Ruta de <span className="text-primary">{child?.displayName ?? "Estudiante"}</span>
           </h1>
           <div className="flex items-center gap-2 text-muted-foreground text-sm mt-1">
             <button onClick={() => navigate("/")} className="hover:text-primary transition-colors">
               Rutas
             </button>
             <span>/</span>
-            <span>Ruta de {child.displayName}</span>
+            <span>Ruta de {child?.displayName ?? "Estudiante"}</span>
           </div>
         </div>
 
@@ -72,16 +90,18 @@ const RouteDetailPage = () => {
           </TabsList>
 
           <TabsContent value="history" className="flex-1 px-4 mt-0">
-            {/* Historial: lista de eventos (restaurada a su estado original) */}
+            {/* Historial: lista de eventos (cargados desde api) */}
             <div className="bg-card rounded-2xl p-4 shadow-card mr-12 md:mr-20 w-[85%]">
-              {events.map((event, index) => (
-                <RouteEventItem
-                  key={index}
-                  message={event.message}
-                  time={event.time}
-                  isLast={index === events.length - 1}
-                />
-              ))}
+              {loadingEvents
+                ? null
+                : events.map((event, index) => (
+                    <RouteEventItem
+                      key={index}
+                      message={event.message}
+                      time={event.time}
+                      isLast={index === events.length - 1}
+                    />
+                  ))}
             </div>
           </TabsContent>
 

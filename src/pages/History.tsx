@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MobileLayout from "@/components/layout/MobileLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,6 +15,8 @@ import {
   Filter,
   Route
 } from "lucide-react";
+import { api } from "@/lib/api";
+import { statusFilters as statusFiltersData } from "@/mocks/mocksData";
 
 interface RouteStop {
   location: string;
@@ -36,132 +38,53 @@ interface RouteHistory {
   novelties: string[];
 }
 
-const childrenList = [
-  { id: "all", name: "Todos los hijos" },
-  { id: "alfonso", name: "Alfonso Miguel" },
-  { id: "luis", name: "Luis José" },
-];
+// children se cargan desde mocks via api.getChildren
+// El componente añadirá una opción "all" localmente
 
-const statusFilters = [
-  { id: "all", label: "Todas", icon: Route },
-  { id: "completed", label: "Completadas", icon: CheckCircle },
-  { id: "cancelled", label: "Canceladas", icon: XCircle },
-  { id: "no_show", label: "No abordó", icon: UserX },
-];
-
-const mockHistory: RouteHistory[] = [
-  {
-    id: "1",
-    date: "2024-01-15",
-    childId: "luis",
-    childName: "Luis José",
-    type: "ida",
-    status: "completed",
-    departureTime: "6:15 AM",
-    arrivalTime: "7:00 AM",
-    totalDuration: "45 min",
-    stops: [
-      { location: "Casa - Calle 85 #15-30", time: "6:15 AM", type: "pickup" },
-      { location: "Parada Av. 9na", time: "6:25 AM", type: "pickup" },
-      { location: "Parada Calle 100", time: "6:40 AM", type: "pickup" },
-      { location: "Colegio Buckingham", time: "7:00 AM", type: "school" },
-    ],
-    novelties: [],
-  },
-  {
-    id: "2",
-    date: "2024-01-15",
-    childId: "alfonso",
-    childName: "Alfonso Miguel",
-    type: "ida",
-    status: "completed",
-    departureTime: "6:15 AM",
-    arrivalTime: "7:00 AM",
-    totalDuration: "45 min",
-    stops: [
-      { location: "Casa - Calle 85 #15-30", time: "6:15 AM", type: "pickup" },
-      { location: "Parada Av. 9na", time: "6:25 AM", type: "pickup" },
-      { location: "Colegio Buckingham", time: "7:00 AM", type: "school" },
-    ],
-    novelties: [],
-  },
-  {
-    id: "3",
-    date: "2024-01-14",
-    childId: "luis",
-    childName: "Luis José",
-    type: "regreso",
-    status: "completed",
-    departureTime: "3:00 PM",
-    arrivalTime: "3:50 PM",
-    totalDuration: "50 min",
-    stops: [
-      { location: "Colegio Buckingham", time: "3:00 PM", type: "school" },
-      { location: "Parada Calle 100", time: "3:20 PM", type: "dropoff" },
-      { location: "Casa - Calle 85 #15-30", time: "3:50 PM", type: "dropoff" },
-    ],
-    novelties: ["Retraso de 10 minutos por tráfico en Av. 9na"],
-  },
-  {
-    id: "4",
-    date: "2024-01-12",
-    childId: "alfonso",
-    childName: "Alfonso Miguel",
-    type: "ida",
-    status: "cancelled",
-    departureTime: "6:15 AM",
-    arrivalTime: "-",
-    totalDuration: "-",
-    stops: [],
-    novelties: ["Ruta cancelada por condiciones climáticas adversas"],
-  },
-  {
-    id: "5",
-    date: "2024-01-11",
-    childId: "luis",
-    childName: "Luis José",
-    type: "regreso",
-    status: "no_show",
-    departureTime: "3:00 PM",
-    arrivalTime: "3:45 PM",
-    totalDuration: "45 min",
-    stops: [
-      { location: "Colegio Buckingham", time: "3:00 PM", type: "school" },
-      { location: "Parada Calle 100", time: "3:20 PM", type: "dropoff" },
-      { location: "Casa - Calle 85 #15-30", time: "3:45 PM", type: "dropoff" },
-    ],
-    novelties: ["El estudiante no abordó el bus - Recogido por familiar"],
-  },
-  {
-    id: "6",
-    date: "2024-01-10",
-    childId: "alfonso",
-    childName: "Alfonso Miguel",
-    type: "regreso",
-    status: "completed",
-    departureTime: "3:00 PM",
-    arrivalTime: "3:55 PM",
-    totalDuration: "55 min",
-    stops: [
-      { location: "Colegio Buckingham", time: "3:00 PM", type: "school" },
-      { location: "Parada Av. 9na", time: "3:30 PM", type: "dropoff" },
-      { location: "Casa - Calle 85 #15-30", time: "3:55 PM", type: "dropoff" },
-    ],
-    novelties: [],
-  },
-];
+// Mapeo simple para convertir el nombre del icono (string) a componente lucide
+const iconMap: Record<string, any> = {
+  Route,
+  CheckCircle,
+  XCircle,
+  UserX,
+};
 
 const History = () => {
+  const [childrenList, setChildrenList] = useState<{ id: string; name: string }[]>([]);
+  const [history, setHistory] = useState<RouteHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    api.getChildren().then((res) => {
+      if (!mounted) return;
+      const list = [{ id: "all", name: "Todos los hijos" }, ...res.map((c) => ({ id: c.id, name: c.name }))];
+      setChildrenList(list);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const [selectedChild, setSelectedChild] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedRoute, setSelectedRoute] = useState<RouteHistory | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  const filteredHistory = mockHistory.filter((route) => {
-    const matchChild = selectedChild === "all" || route.childId === selectedChild;
-    const matchStatus = selectedStatus === "all" || route.status === selectedStatus;
-    return matchChild && matchStatus;
-  });
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    api.queryRouteHistory({ childId: selectedChild, status: selectedStatus }).then((res) => {
+      if (!mounted) return;
+      setHistory(res);
+      setLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [selectedChild, selectedStatus]);
+
+  const filteredHistory = history; // already filtered server-side (simulado)
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -242,18 +165,21 @@ const History = () => {
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-2">Estado</p>
               <div className="flex flex-wrap gap-2">
-                {statusFilters.map((filter) => (
-                  <Button
-                    key={filter.id}
-                    variant={selectedStatus === filter.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedStatus(filter.id)}
-                    className="text-xs gap-1"
-                  >
-                    <filter.icon className="w-3 h-3" />
-                    {filter.label}
-                  </Button>
-                ))}
+                {statusFiltersData.map((filter) => {
+                  const Icon = iconMap[filter.icon as string] ?? Route;
+                  return (
+                    <Button
+                      key={filter.id}
+                      variant={selectedStatus === filter.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedStatus(filter.id)}
+                      className="text-xs gap-1"
+                    >
+                      <Icon className="w-3 h-3" />
+                      {filter.label}
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -261,12 +187,12 @@ const History = () => {
 
         {/* Results count */}
         <p className="text-sm text-muted-foreground mb-3">
-          {filteredHistory.length} ruta{filteredHistory.length !== 1 ? "s" : ""} encontrada{filteredHistory.length !== 1 ? "s" : ""}
+          {loading ? "Cargando..." : `${filteredHistory.length} ruta${filteredHistory.length !== 1 ? "s" : ""} encontrada${filteredHistory.length !== 1 ? "s" : ""}`}
         </p>
 
         {/* Route History List */}
         <div className="space-y-3">
-          {filteredHistory.map((route) => {
+          {loading ? null : filteredHistory.map((route) => {
             const statusConfig = getStatusConfig(route.status);
             const StatusIcon = statusConfig.icon;
 
@@ -319,7 +245,7 @@ const History = () => {
           })}
         </div>
 
-        {filteredHistory.length === 0 && (
+        {!loading && filteredHistory.length === 0 && (
           <div className="text-center py-12">
             <Bus className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">No se encontraron rutas con los filtros seleccionados</p>
@@ -399,15 +325,8 @@ const History = () => {
                             <p className="text-sm font-medium text-foreground truncate pr-2">
                               {stop.location}
                             </p>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              {stop.time}
-                            </span>
+                            <p className="text-sm text-muted-foreground">{stop.time}</p>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {stop.type === "pickup" && "Recogida"}
-                            {stop.type === "dropoff" && "Entrega"}
-                            {stop.type === "school" && "Colegio"}
-                          </p>
                         </div>
                       </div>
                     ))}
@@ -418,57 +337,12 @@ const History = () => {
               {/* Novelties */}
               {selectedRoute.novelties.length > 0 && (
                 <div>
-                  <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    Novedades
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedRoute.novelties.map((novelty, index) => (
-                      <div
-                        key={index}
-                        className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3"
-                      >
-                        <p className="text-sm text-amber-800 dark:text-amber-200">{novelty}</p>
-                      </div>
+                  <h3 className="font-semibold text-foreground mb-2">Novedades</h3>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground">
+                    {selectedRoute.novelties.map((n, i) => (
+                      <li key={i}>{n}</li>
                     ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Arrival Info */}
-              {selectedRoute.status === "completed" && (
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <p className="font-medium text-green-700 dark:text-green-300">Ruta completada</p>
-                  </div>
-                  <p className="text-sm text-green-600 dark:text-green-400">
-                    Llegada a las {selectedRoute.arrivalTime}
-                  </p>
-                </div>
-              )}
-
-              {selectedRoute.status === "cancelled" && (
-                <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <XCircle className="w-4 h-4 text-destructive" />
-                    <p className="font-medium text-destructive">Ruta cancelada</p>
-                  </div>
-                  <p className="text-sm text-destructive/80">
-                    Esta ruta fue cancelada y no se realizó
-                  </p>
-                </div>
-              )}
-
-              {selectedRoute.status === "no_show" && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <UserX className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <p className="font-medium text-amber-700 dark:text-amber-300">Estudiante no abordó</p>
-                  </div>
-                  <p className="text-sm text-amber-600 dark:text-amber-400">
-                    El estudiante no subió al bus en esta ruta
-                  </p>
+                  </ul>
                 </div>
               )}
             </div>
@@ -480,3 +354,4 @@ const History = () => {
 };
 
 export default History;
+
