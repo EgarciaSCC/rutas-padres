@@ -306,3 +306,23 @@ export const statusFilters = [
   { id: "cancelled", label: "Canceladas", icon: "XCircle" },
   { id: "no_show", label: "No abordó", icon: "UserX" },
 ];
+
+// --- Added: precise location data per child (bus and home) ---
+export interface RouteLocations {
+  busLocation: { lat: number; lng: number };
+  homeLocation: { lat: number; lng: number };
+}
+
+// Coordenadas de ejemplo (Bogotá area) — usadas por la vista 'Ver ruta'
+export const routeLocationsByChild: Record<string, RouteLocations> = {
+  // Luis (coordenadas coherentes con ejemplo previo)
+  luis: {
+    busLocation: { lat: 4.7247, lng: -74.0547 },
+    homeLocation: { lat: 4.7150, lng: -74.0600 },
+  },
+  // Alfonso (ubicación distinta de ejemplo)
+  alfonso: {
+    busLocation: { lat: 4.7305, lng: -74.0450 },
+    homeLocation: { lat: 4.7220, lng: -74.0500 },
+  },
+};

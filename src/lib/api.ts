@@ -8,6 +8,8 @@ import {
   Child,
   RouteEvent,
   RouteHistory,
+  routeLocationsByChild,
+  RouteLocations,
 } from "@/mocks/mocksData";
 
 function delay<T>(value: T, ms = 400): Promise<T> {
@@ -62,6 +64,11 @@ export const api = {
 
   getExceptions: async (): Promise<any[]> => {
     return delay(parseExceptions(mockExceptions), 350);
+  },
+
+  // New: obtener ubicaciones (bus y casa) para un niño
+  getRouteLocations: async (childId: string): Promise<RouteLocations | null> => {
+    return delay(routeLocationsByChild[childId] ?? null, 250);
   },
 };
 

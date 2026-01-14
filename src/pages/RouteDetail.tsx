@@ -23,9 +23,14 @@ const RouteDetailPage = () => {
   const [child, setChild] = useState<any | null>(null);
   const [loadingChild, setLoadingChild] = useState(true);
 
-  // Simulated bus location (Bogotá area)
-  const [busLocation] = useState({ lat: 4.7247, lng: -74.0547 });
-  const homeLocation = { lat: 4.7150, lng: -74.0600 };
+  // Location state (will be loaded from mocks via api.getRouteLocations)
+  const [busLocation, setBusLocation] = useState<{ lat: number; lng: number }>(
+    { lat: 4.7247, lng: -74.0547 }
+  );
+  const [homeLocation, setHomeLocation] = useState<{ lat: number; lng: number }>(
+    { lat: 4.7150, lng: -74.0600 }
+  );
+  const [loadingLocations, setLoadingLocations] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -55,8 +60,25 @@ const RouteDetailPage = () => {
     };
   }, [childId]);
 
+  useEffect(() => {
+    let mounted = true;
+    const id = childId || "luis";
+    setLoadingLocations(true);
+    api.getRouteLocations(id).then((res) => {
+      if (!mounted) return;
+      if (res) {
+        setBusLocation(res.busLocation);
+        setHomeLocation(res.homeLocation);
+      }
+      setLoadingLocations(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [childId]);
+
   return (
-    <MobileLayout showHeader={true}>
+    <MobileLayout showHeader={true} hideHeaderOnSmall={activeTab === "map"} hideBottomOnSmall={activeTab === "map"}>
       <div className="flex flex-col h-full">
         {/* Header section */}
         <div className="px-4 py-2">
@@ -109,6 +131,7 @@ const RouteDetailPage = () => {
             <RouteMap
               busLocation={busLocation}
               homeLocation={homeLocation}
+              loading={loadingLocations}
               lastUpdate="01/04/2025 06:37:08"
               distanceToHome="2,3km"
               events={events}

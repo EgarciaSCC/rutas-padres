@@ -16,6 +16,7 @@ interface RouteMapProps {
   showEvents?: boolean;
   toggleShowEvents?: () => void;
   onCloseEvent?: (index: number) => void;
+  loading?: boolean;
 }
 
 const RouteMap = ({
@@ -27,6 +28,7 @@ const RouteMap = ({
   showEvents = true,
   toggleShowEvents,
   onCloseEvent,
+  loading = false,
 }: RouteMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -133,6 +135,59 @@ const RouteMap = ({
     }
   }, [busLocation]);
 
+  // Update home marker position and refit bounds when either location changes
+  useEffect(() => {
+    if (!map.current) return;
+
+    // update or create home marker
+    if (homeMarker.current) {
+      homeMarker.current.setLngLat([homeLocation.lng, homeLocation.lat]);
+    } else {
+      const homeEl = document.createElement("div");
+      homeEl.className = "home-marker";
+      homeEl.innerHTML = `
+        <div style="
+          width: 48px;
+          height: 48px;
+          background: hsl(270 60% 55%);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 14px -2px hsl(270 60% 55% / 0.5);
+        ">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+      `;
+
+      homeMarker.current = new mapboxgl.Marker({ element: homeEl })
+        .setLngLat([homeLocation.lng, homeLocation.lat])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 }).setHTML(`
+            <div style="padding: 8px; text-align: center;">
+              <strong>Último registro</strong><br/>
+              <span style="color: #666;">${lastUpdate}</span>
+            </div>
+          `)
+        )
+        .addTo(map.current);
+    }
+
+    // Refit bounds to show both markers when locations update
+    try {
+      const bounds = new mapboxgl.LngLatBounds()
+        .extend([busLocation.lng, busLocation.lat])
+        .extend([homeLocation.lng, homeLocation.lat]);
+
+      map.current.fitBounds(bounds, { padding: { top: 80, right: 120, bottom: 80, left: 80 } });
+    } catch (e) {
+      // ignore errors if locations are invalid
+    }
+  }, [homeLocation, busLocation, lastUpdate]);
+
   const centerOnBus = () => {
     map.current?.flyTo({
       center: [busLocation.lng, busLocation.lat],
@@ -142,9 +197,22 @@ const RouteMap = ({
   };
 
   return (
-    <div className="relative w-full h-full min-h-[400px]">
+    <div className="relative w-full h-full min-h-[75vh] md:min-h-[400px]">
       {/* Add right padding so Mapbox controls positioned at top-right are inset and visible */}
       <div ref={mapContainer} className="absolute inset-0 rounded-t-2xl pr-12 md:pr-20" />
+
+      {/* Loading overlay shown while locations are being fetched */}
+      {loading && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-card/70 backdrop-blur-sm">
+          <div className="flex flex-col items-center">
+            <svg className="animate-spin h-10 w-10 text-primary" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+              <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
+            </svg>
+            <span className="mt-3 text-sm text-foreground">Cargando ubicación…</span>
+          </div>
+        </div>
+      )}
 
       {/* Toggle de visibilidad de eventos (mostrar/ocultar)
       {toggleShowEvents && (
